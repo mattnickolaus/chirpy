@@ -3,14 +3,21 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
+
+var PROFANITY = map[string]struct{}{
+	"kerfuffle": {},
+	"sharbert":  {},
+	"fornax":    {},
+}
 
 func validateChirp(w http.ResponseWriter, r *http.Request) {
 	type chirp struct {
 		Body string `json:"body"`
 	}
 	type successResponse struct {
-		Valid bool `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -28,8 +35,24 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	valid := successResponse{
-		Valid: true,
+	cleanedChirp := filterProfanity(c.Body)
+
+	cleanedResponse := successResponse{
+		CleanedBody: cleanedChirp,
 	}
-	respondWithJSON(w, http.StatusOK, valid)
+	respondWithJSON(w, http.StatusOK, cleanedResponse)
+}
+
+func filterProfanity(chirpText string) string {
+
+	chirpWords := strings.Split(chirpText, " ")
+
+	for i, w := range chirpWords {
+		lowercaseWord := strings.ToLower(w)
+		if _, containsProf := PROFANITY[lowercaseWord]; containsProf {
+			chirpWords[i] = "****"
+		}
+	}
+
+	return strings.Join(chirpWords, " ")
 }
