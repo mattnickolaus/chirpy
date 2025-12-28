@@ -7,9 +7,16 @@ import (
 
 func (cfg *apiConfig) resetHits(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
 
 	cfg.fileserverHits.Store(0)
-	resetHits := fmt.Sprintf("Reset Hits: %v", cfg.fileserverHits.Load())
+	resetHits := fmt.Sprintf("Reset Hits: %v\nAll users deleted\n", cfg.fileserverHits.Load())
+
+	if cfg.platform != "dev" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	cfg.db.DeleteAllUsers(r.Context())
+
+	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(resetHits))
 }
