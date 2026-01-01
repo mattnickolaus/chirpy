@@ -2,6 +2,8 @@ package auth
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alexedwards/argon2id"
@@ -49,7 +51,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 
 	t, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v\n", token.Header["alg"])
 		}
 		return []byte(tokenSecret), nil
 	})
@@ -57,7 +59,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 	if !t.Valid {
-		return uuid.Nil, fmt.Errorf("Token invalid")
+		return uuid.Nil, fmt.Errorf("Token invalid\n")
 	}
 
 	userIDString, err := claims.GetSubject()
@@ -70,4 +72,18 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	}
 
 	return userID, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
+		return "No Auth Header Found", fmt.Errorf("Authorization Header is blank\n")
+	}
+
+	tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
+	if tokenString == "" {
+		return "No Token String Found", fmt.Errorf("No token_string found\n")
+	}
+
+	return tokenString, nil
 }

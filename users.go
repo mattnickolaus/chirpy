@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/mattnickolaus/chirpy/internal/auth"
 	"github.com/mattnickolaus/chirpy/internal/database"
@@ -54,8 +55,9 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	type loginInput struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password         string `json:"password"`
+		Email            string `json:"email"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -83,11 +85,22 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	expiresIn := u.ExpiresInSeconds
+	if expiresIn < 1 || expiresIn > 3600 {
+		expiresIn = 3600
+	}
+	tokenString, err := auth.MakeJWT(user.ID, cfg.secret, time.Second*time.Duration(expiresIn))
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to generate Web Token", err)
+		return
+	}
+
 	returnUser := User{
 		ID:        user.ID,
 		CreatedAt: user.CreatedAt.Time,
 		UpdatedAt: user.UpdatedAt.Time,
 		Email:     user.Email,
+		Token:     tokenString,
 	}
 
 	respondWithJSON(w, http.StatusOK, returnUser)
