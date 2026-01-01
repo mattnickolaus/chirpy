@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/alexedwards/argon2id"
@@ -40,6 +41,33 @@ func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (str
 			Subject:   userID.String(),
 		},
 	)
+	return token.SignedString([]byte(tokenSecret))
+}
 
-	token.SignedString()
+func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
+	claims := jwt.RegisteredClaims{}
+
+	t, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(tokenSecret), nil
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !t.Valid {
+		return uuid.Nil, fmt.Errorf("Token invalid")
+	}
+
+	userIDString, err := claims.GetSubject()
+	if err != nil {
+		return uuid.Nil, err
+	}
+	userID, err := uuid.Parse(userIDString)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return userID, nil
 }
