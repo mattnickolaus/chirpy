@@ -55,9 +55,8 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	type loginInput struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -85,22 +84,44 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expiresIn := u.ExpiresInSeconds
-	if expiresIn < 1 || expiresIn > 3600 {
-		expiresIn = 3600
-	}
-	tokenString, err := auth.MakeJWT(user.ID, cfg.secret, time.Second*time.Duration(expiresIn))
+	// NOTE: Hard Coded 1 hour JWT expiration time
+	expiresInHour := time.Second * time.Duration(3600)
+
+	tokenString, err := auth.MakeJWT(user.ID, cfg.secret, expiresInHour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Unable to generate Web Token", err)
 		return
 	}
 
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to generate Refresh Token", err)
+		return
+	}
+	// NOTE: Hard Coded 60 days from now expiration for Refresh Token
+	expiresSixtyDaysFromToday := sql.NullTime{
+		Time:  time.Now().Add(60 * 24 * time.Hour),
+		Valid: true,
+	}
+	refreshTokenParams := database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		ExpiresAt: expiresSixtyDaysFromToday,
+		UserID:    user.ID,
+	}
+
+	writtenRefreshToken, err := cfg.db.CreateRefreshToken(r.Context(), refreshTokenParams)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to write Refresh Token to DB", err)
+		return
+	}
+
 	returnUser := User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt.Time,
-		UpdatedAt: user.UpdatedAt.Time,
-		Email:     user.Email,
-		Token:     tokenString,
+		ID:           user.ID,
+		CreatedAt:    user.CreatedAt.Time,
+		UpdatedAt:    user.UpdatedAt.Time,
+		Email:        user.Email,
+		Token:        tokenString,
+		RefreshToken: writtenRefreshToken.Token,
 	}
 
 	respondWithJSON(w, http.StatusOK, returnUser)

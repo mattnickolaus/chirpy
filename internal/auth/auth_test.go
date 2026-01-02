@@ -144,7 +144,35 @@ func TestGetBearerToken(t *testing.T) {
 
 			actualMatch := outputTokenString == tt.tokenString
 			if actualMatch != tt.match {
-				t.Errorf("got: %v; want: %v\nInputUser: %v; OutputUser: %v\n", actualMatch, tt.match, outputTokenString, tt.tokenString)
+				t.Errorf("got: %v; want: %v\nOutput Token: %v; Input Token: %v\n", actualMatch, tt.match, outputTokenString, tt.tokenString)
+			}
+		})
+	}
+}
+
+func TestMakeRefreshToken(t *testing.T) {
+	tests := []struct {
+		name     string
+		returned bool
+	}{
+		{
+			name:     "Test 1: Refresh Token Generated",
+			returned: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			refreshToken, err := MakeRefreshToken()
+			if err != nil {
+				t.Errorf("Error Making Refresh Token: %v", err)
+			}
+
+			fmt.Printf("Refresh Token String:'%v'\nRefresh Token String Length: %v\n", refreshToken, len(refreshToken))
+
+			actualMatch := refreshToken != ""
+			if actualMatch != tt.returned {
+				t.Errorf("got: %v; want: %v\n; Refresh Token:'%v'\n", actualMatch, tt.returned, refreshToken)
 			}
 		})
 	}
