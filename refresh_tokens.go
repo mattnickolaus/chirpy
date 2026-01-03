@@ -1,10 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"net/http"
 	"time"
 
 	"github.com/mattnickolaus/chirpy/internal/auth"
+	"github.com/mattnickolaus/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) refreshAccessToken(w http.ResponseWriter, r *http.Request) {
@@ -17,6 +19,16 @@ func (cfg *apiConfig) refreshAccessToken(w http.ResponseWriter, r *http.Request)
 	refreshTokenRecord, err := cfg.db.GetUserFromRefreshToken(r.Context(), refreshTokenString)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized: Refresh Token Invalid", err)
+		return
+	}
+
+	if refreshTokenRecord.RevokedAt.Valid {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: Refresh Token Revoked", nil)
+		return
+	}
+
+	if refreshTokenRecord.ExpiresAt.Time.Before(time.Now()) {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: Refresh Token Revoked", nil)
 		return
 	}
 
@@ -37,4 +49,31 @@ func (cfg *apiConfig) refreshAccessToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	respondWithJSON(w, http.StatusOK, returnedAccessToken)
+}
+
+func (cfg *apiConfig) revokeRefreshToken(w http.ResponseWriter, r *http.Request) {
+	refreshTokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: Refresh Token Invalid", err)
+		return
+	}
+
+	nowTime := sql.NullTime{
+		Time:  time.Now(),
+		Valid: true,
+	}
+
+	revokeParams := database.RevokeRefreshTokenParams{
+		Token:     refreshTokenString,
+		RevokedAt: nowTime,
+		UpdatedAt: nowTime,
+	}
+
+	err = cfg.db.RevokeRefreshToken(r.Context(), revokeParams)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: Refresh Token Invalid", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusNoContent, nil)
 }
