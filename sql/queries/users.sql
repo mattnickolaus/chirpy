@@ -16,3 +16,12 @@ DELETE FROM users;
 SELECT * FROM users
 WHERE $1 = email
 LIMIT 1;
+
+-- name: UpdateUser :one
+UPDATE users
+SET
+    email = $2,
+    hashed_password = $3,
+    updated_at = NOW() 
+WHERE $1 = id
+RETURNING *;

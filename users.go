@@ -53,6 +53,60 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusCreated, returnUser)
 }
 
+func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: Token Invalid", err)
+		return
+	}
+	userID, err := auth.ValidateJWT(tokenString, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: Token Invalid:", err)
+		return
+	}
+
+	type updateUserInput struct {
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+	u := updateUserInput{}
+	decoder := json.NewDecoder(r.Body)
+
+	err = decoder.Decode(&u)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
+	hashedPassword, err := auth.HashPassword(u.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error hashing password", err)
+		return
+	}
+	convertedHashedPassword := sql.NullString{String: hashedPassword, Valid: true}
+
+	updateUserParams := database.UpdateUserParams{
+		ID:             userID,
+		Email:          u.Email,
+		HashedPassword: convertedHashedPassword,
+	}
+
+	updatedUser, err := cfg.db.UpdateUser(r.Context(), updateUserParams)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error Writing to database", err)
+		return
+	}
+
+	returnedUpdatedUser := User{
+		ID:        updatedUser.ID,
+		CreatedAt: updatedUser.CreatedAt.Time,
+		UpdatedAt: updatedUser.UpdatedAt.Time,
+		Email:     updatedUser.Email,
+	}
+
+	respondWithJSON(w, http.StatusOK, returnedUpdatedUser)
+}
+
 func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	type loginInput struct {
 		Password string `json:"password"`
