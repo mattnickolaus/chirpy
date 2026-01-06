@@ -44,10 +44,11 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	returnUser := User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt.Time,
-		UpdatedAt: user.UpdatedAt.Time,
-		Email:     user.Email,
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt.Time,
+		UpdatedAt:   user.UpdatedAt.Time,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed.Bool,
 	}
 
 	respondWithJSON(w, http.StatusCreated, returnUser)
@@ -98,10 +99,11 @@ func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	returnedUpdatedUser := User{
-		ID:        updatedUser.ID,
-		CreatedAt: updatedUser.CreatedAt.Time,
-		UpdatedAt: updatedUser.UpdatedAt.Time,
-		Email:     updatedUser.Email,
+		ID:          updatedUser.ID,
+		CreatedAt:   updatedUser.CreatedAt.Time,
+		UpdatedAt:   updatedUser.UpdatedAt.Time,
+		Email:       updatedUser.Email,
+		IsChirpyRed: updatedUser.IsChirpyRed.Bool,
 	}
 
 	respondWithJSON(w, http.StatusOK, returnedUpdatedUser)
@@ -176,6 +178,7 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		Email:        user.Email,
 		Token:        tokenString,
 		RefreshToken: writtenRefreshToken.Token,
+		IsChirpyRed:  user.IsChirpyRed.Bool,
 	}
 
 	respondWithJSON(w, http.StatusOK, returnUser)
