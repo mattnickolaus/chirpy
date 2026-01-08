@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/mattnickolaus/chirpy/internal/auth"
@@ -62,14 +63,31 @@ func (cfg *apiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
-	allChirps, err := cfg.db.GetAllChirps(r.Context())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error Reading Chirps from DB", err)
-		return
+	authorID := r.URL.Query().Get("author_id")
+
+	returnedChirps := []database.Chirp{}
+	if authorID != "" {
+		authorUserID, err := uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "No chirps by that author_id were found", err)
+			return
+		}
+		returnedChirps, err = cfg.db.GetAllChirpsByUser(r.Context(), authorUserID)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error: No chirps by that author_id were found", err)
+			return
+		}
+	} else {
+		allChirps, err := cfg.db.GetAllChirps(r.Context())
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error Reading Chirps from DB", err)
+			return
+		}
+		returnedChirps = allChirps
 	}
 
 	responseChirps := []Chirp{}
-	for _, c := range allChirps {
+	for _, c := range returnedChirps {
 		newChirp := Chirp{
 			ID:        c.ID,
 			CreatedAt: c.CreatedAt.Time,
@@ -78,6 +96,17 @@ func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
 			UserID:    c.UserID,
 		}
 		responseChirps = append(responseChirps, newChirp)
+	}
+
+	sortType := r.URL.Query().Get("sort")
+	if sortType != "desc" && sortType != "asc" && sortType != "" {
+		respondWithError(w, http.StatusNotFound, "Invalid sort parameter: accepts only 'asc' or 'desc'", nil)
+		return
+	}
+	if sortType == "desc" {
+		sort.Slice(responseChirps, func(i, j int) bool {
+			return responseChirps[i].CreatedAt.After(responseChirps[j].CreatedAt)
+		})
 	}
 
 	respondWithJSON(w, http.StatusOK, responseChirps)
