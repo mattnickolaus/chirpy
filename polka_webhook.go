@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/mattnickolaus/chirpy/internal/auth"
 )
 
 type polkaWebHookRequest struct {
@@ -15,10 +16,20 @@ type polkaWebHookRequest struct {
 }
 
 func (cfg *apiConfig) upgradeToChirpyRed(w http.ResponseWriter, r *http.Request) {
+	requestApiKey, err := auth.GetApiKey(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: API Key invalid", err)
+		return
+	}
+	if requestApiKey != cfg.polkaApiKey {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized: API Key invalid", err)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	p := polkaWebHookRequest{}
 
-	err := decoder.Decode(&p)
+	err = decoder.Decode(&p)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
 		return
